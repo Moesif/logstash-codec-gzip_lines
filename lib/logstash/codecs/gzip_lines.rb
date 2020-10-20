@@ -2,6 +2,7 @@
 require "logstash/codecs/base"
 require "logstash/codecs/plain"
 require "logstash/json"
+require "logstash/event"
 require "zlib"
 require "stringio"
 
@@ -28,6 +29,13 @@ class LogStash::Codecs::GzipLines < LogStash::Codecs::Base
     @converter.logger = @logger
   end
 
+  def from_json_parse(json)
+    LogStash::Event.from_json(json).each { |event| yield event }
+  rescue LogStash::Json::ParserError => e
+    @logger.error("JSON parse error, original data now in message field", :error => e, :data => json)
+    yield LogStash::Event.new("message" => json, "tags" => ["_jsonparsefailure"])
+  end
+
   public
   def decode(data)
     data = StringIO.new(data) if data.kind_of?(String)
@@ -35,14 +43,13 @@ class LogStash::Codecs::GzipLines < LogStash::Codecs::Base
     @decoder = Zlib::GzipReader.new(data)
 
     begin
-      @decoder.each_line do |line|
-        yield LogStash::Event.new("message" => @converter.convert(line))
-      end
+      decompressed_data = @decoder.read
+      from_json_parse(decompressed_data)
     rescue Zlib::Error, Zlib::GzipFile::Error=> e
-      file = data.is_a?(String) ? data : data.class
+      @logger.debug("Gzip codec: We cannot uncompress the gzip data", :data => data)
 
-      @logger.error("Gzip codec: We cannot uncompress the gzip file", :filename => file)
-      raise e
+      # if failed to decompress, try json parsing original data
+      from_json_parse(data)
     end
   end # def decode
 end # class LogStash::Codecs::GzipLines
