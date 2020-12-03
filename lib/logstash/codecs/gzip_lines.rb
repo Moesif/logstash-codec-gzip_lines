@@ -6,7 +6,6 @@ require "logstash/json"
 require "logstash/event"
 require "zlib"
 require "stringio"
-require 'json'
 
 # This codec will read gzip encoded content
 class LogStash::Codecs::GzipLines < LogStash::Codecs::Base
@@ -35,6 +34,9 @@ class LogStash::Codecs::GzipLines < LogStash::Codecs::Base
 
   public
   def decode(data,  &block)
+    # Escape '[' or ']' in the key 
+    data = data.gsub!(/(\w+)\[(\d+)\]/, '\1%5B\2%5D')
+
     @logger.info("Got  GZIP LINES", :data => data)
     dataIo = StringIO.new(data) if data.kind_of?(String)
 
@@ -50,26 +52,12 @@ class LogStash::Codecs::GzipLines < LogStash::Codecs::Base
     end
   end # def decode
 
-
-  private
-  def deep_transform(data, &block)
-    result = {}
-    data.each do |key, value|
-      result[yield(key.gsub("[","%5B").gsub("]","%5D"))] = value.is_a?(Hash) ? deep_transform(value, &block) : value
-    end
-    result
-  end
-
   private
   def from_json_parse(data, &block)
-    json_data = @converter.convert(data)
-    # Convert json string to hash
-    json_data = JSON.parse(json_data)
-    # Escape '[' or ']' in the key and convert back to json string
-    json_data = deep_transform(json_data, &:strip).to_json
-    LogStash::Event.from_json(json_data).each { |event| yield event }
+    json = @converter.convert(data)
+    LogStash::Event.from_json(json).each { |event| yield event }
   rescue LogStash::Json::ParserError => e
-    @logger.error("JSON parse error, original data now in message field", :error => e, :data => json_data)
-    yield LogStash::Event.new("message" => json_data, "tags" => ["_jsonparsefailure"])
+    @logger.error("JSON parse error, original data now in message field", :error => e, :data => json)
+    yield LogStash::Event.new("message" => json, "tags" => ["_jsonparsefailure"])
   end
 end # class LogStash::Codecs::GzipLines
