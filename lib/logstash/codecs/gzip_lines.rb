@@ -34,9 +34,6 @@ class LogStash::Codecs::GzipLines < LogStash::Codecs::Base
 
   public
   def decode(data,  &block)
-    # Escape '[' or ']' in the key 
-    data = data.gsub!(/(\w+)\[(\d+)\]/, '\1%5B\2%5D')
-
     @logger.info("Got  GZIP LINES", :data => data)
     dataIo = StringIO.new(data) if data.kind_of?(String)
 
@@ -54,6 +51,8 @@ class LogStash::Codecs::GzipLines < LogStash::Codecs::Base
 
   private
   def from_json_parse(data, &block)
+    # Escape '[' or ']' in the key 
+    data = data.gsub(/(\w+)\[(\d+)\]/, '\1%5B\2%5D')
     json = @converter.convert(data)
     LogStash::Event.from_json(json).each { |event| yield event }
   rescue LogStash::Json::ParserError => e
