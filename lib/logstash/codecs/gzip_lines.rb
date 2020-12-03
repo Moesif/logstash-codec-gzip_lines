@@ -52,7 +52,7 @@ class LogStash::Codecs::GzipLines < LogStash::Codecs::Base
   private
   def from_json_parse(data, &block)
     # Escape '[' or ']' in the key 
-    data = data.gsub(/(\w+)\[(\d+)\]/, '\1%5B\2%5D')
+    data = data.gsub(/\s+/, "").gsub(/"(\w+)[$&+,:;=?@#|'<>.^*()%!-]?\[(\d+)\](\.\S+?|\.*?)"[\r\n]*?:/, '"\1%5B\2%5D\3":')
     json = @converter.convert(data)
     LogStash::Event.from_json(json).each { |event| yield event }
   rescue LogStash::Json::ParserError => e
