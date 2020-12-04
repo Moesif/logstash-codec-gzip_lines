@@ -50,7 +50,6 @@ class LogStash::Codecs::GzipLines < LogStash::Codecs::Base
     end
   end # def decode
 
-
   private
   def deep_transform(data, &block)
     result = {}
@@ -65,11 +64,11 @@ class LogStash::Codecs::GzipLines < LogStash::Codecs::Base
     json_data = @converter.convert(data)
     # Convert json string to hash
     json_data = JSON.parse(json_data)
-    # Escape '[' or ']' in the key and convert back to json string
-    json_data = deep_transform(json_data, &:strip).to_json
-    LogStash::Event.from_json(json_data).each { |event| yield event }
+    # Escape '[' or ']' in the key
+    json_data = deep_transform(json_data, &:strip)
+    yield LogStash::Event.new(json_data)
   rescue LogStash::Json::ParserError => e
-    @logger.error("JSON parse error, original data now in message field", :error => e, :data => json_data)
+    @logger.error("JSON parse error, original data now in message field", :error => e, :data => data)
     yield LogStash::Event.new("message" => json_data, "tags" => ["_jsonparsefailure"])
   end
 end # class LogStash::Codecs::GzipLines
