@@ -68,7 +68,7 @@ class LogStash::Codecs::GzipLines < LogStash::Codecs::Base
     json_data = deep_transform(json_data, &:strip)
     yield LogStash::Event.new(json_data)
   rescue LogStash::Json::ParserError => e
-    @logger.error("JSON parse error, original data now in message field", :error => e, :data => json_data)
+    @logger.error("JSON parse error, original data now in message field", :error => e, :data => data)
     yield LogStash::Event.new("message" => json_data, "tags" => ["_jsonparsefailure"])
   end
 end # class LogStash::Codecs::GzipLines
