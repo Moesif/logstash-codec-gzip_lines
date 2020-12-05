@@ -6,7 +6,6 @@ require "logstash/json"
 require "logstash/event"
 require "zlib"
 require "stringio"
-require 'json'
 
 # This codec will read gzip encoded content
 class LogStash::Codecs::GzipLines < LogStash::Codecs::Base
@@ -51,12 +50,17 @@ class LogStash::Codecs::GzipLines < LogStash::Codecs::Base
   end # def decode
 
   private
-  def deep_transform(data, &block)
-    result = {}
-    data.each do |key, value|
-      result[yield(key.gsub("[","%5B").gsub("]","%5D"))] = value.is_a?(Hash) ? deep_transform(value, &block) : value
+  def deep_transform(object, &block)
+    case object
+    when Hash
+      object.each_with_object({}) do |(key, value), result|
+        result[yield(key.gsub("[","%5B").gsub("]","%5D"))] = deep_transform(value, &block)
+      end
+    when Array
+      object.map { |e| deep_transform(e, &block) }
+    else
+      object
     end
-    result
   end
 
   private
